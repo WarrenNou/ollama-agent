@@ -5,8 +5,16 @@ The most advanced intelligent CLI agent that uses local Ollama models to execute
 ## 🚀 Ultra-Quick Start
 
 ```bash
-pip install ollama-agent
-ollama-agent
+# Install the package (when published to PyPI)
+pip install ultimate-ai-cli-agent
+
+# Or install from source
+git clone https://github.com/your-username/ollama-agent.git
+cd ollama-agent
+pip install .
+
+# Run the agent
+ultimate-ai-cli
 ```
 
 **That's it!** The agent automatically installs and configures everything you need on first run.
@@ -148,56 +156,50 @@ On first run, the agent will:
 ## 🚀 Quick Installation
 
 ### Simple Install (Recommended)
+
 ```bash
-pip install ollama-agent
+# When published to PyPI
+pip install ultimate-ai-cli-agent
+
+# Or from source (current method)
+git clone https://github.com/your-username/ollama-agent.git
+cd ollama-agent
+pip install .
 ```
 
 ### With Optional Features
+
 ```bash
+# For web automation features
+pip install ultimate-ai-cli-agent[web]
+
+# For server management features  
+pip install ultimate-ai-cli-agent[server]
+
 # For development tools
-pip install ollama-agent[dev]
+pip install ultimate-ai-cli-agent[dev]
 
-# For web development 
-pip install ollama-agent[web]
-
-# For game development (pygame)
-pip install ollama-agent[games]
-
-# All features
-pip install ollama-agent[dev,web,games]
+# All features (recommended)
+pip install ultimate-ai-cli-agent[full]
 ```
 
 ### Prerequisites
-1. Install [Ollama](https://ollama.ai/) and ensure it's running:
+
+1. **Python 3.8+** is required
+2. Install [Ollama](https://ollama.ai/) and ensure it's running:
    ```bash
    ollama serve
    ```
-
-2. Pull a compatible model (e.g., llama3):
+3. Pull a compatible model (e.g., llama3):
    ```bash
    ollama pull llama3
    ```
 
+📋 **For detailed installation instructions, see [INSTALLATION.md](./INSTALLATION.md)**
+
 ### Alternative Installation Methods
 
-#### From Source
-```bash
-git clone https://github.com/ollama-agent/ollama-agent.git
-cd ollama-agent
-pip install -e .
-```
-
-#### Development Installation
-```bash
-# Clone or navigate to the project directory
-cd ollama-agent
-
-# Install in development mode
-pip install -e .
-
-# Or install dependencies directly
-pip install -r requirements.txt
-```
+For detailed installation instructions including troubleshooting, platform-specific instructions, and advanced options, see **[INSTALLATION.md](./INSTALLATION.md)**.
 
 ## 📖 Usage
 
