@@ -290,28 +290,77 @@ pip install ultimate-ai-cli-agent
 deactivate
 ```
 
-## 📞 Support
+## 📤 Publishing to PyPI (For Maintainers)
 
-If you encounter any installation issues:
+If you're a maintainer and want to publish this package to PyPI, follow these steps:
 
-1. Check the [troubleshooting section](#-troubleshooting) above
-2. Review the [project issues](https://github.com/your-username/ollama-agent/issues)
-3. Create a new issue with your installation details
-4. Join our community discussions
-
-## 🎯 Quick Start After Installation
-
-Once installed, you can immediately start using the agent:
+### Prerequisites for Publishing
 
 ```bash
-# Interactive mode
-ultimate-ai-cli
+# Install publishing tools
+pip install build twine
 
-# Direct command
-ultimate-ai-cli "create a hello world python script"
-
-# With specific model
-ultimate-ai-cli -m llama2 "analyze this code file"
+# Ensure you have PyPI credentials configured
 ```
 
-Enjoy using the Ultimate AI CLI Agent! 🤖✨
+### Build the Package
+
+```bash
+# Clean previous builds
+rm -rf dist/ build/ *.egg-info/
+
+# Build source distribution and wheel
+python -m build
+
+# Verify the build
+ls dist/
+# Should show: ultimate_ai_cli_agent-2.0.0-py3-none-any.whl and ultimate_ai_cli_agent-2.0.0.tar.gz
+```
+
+### Test the Package Locally
+
+```bash
+# Test installation from built wheel
+pip install dist/ultimate_ai_cli_agent-2.0.0-py3-none-any.whl
+
+# Test that commands work
+ultimate-ai-cli --help
+uai --help
+ollama-agent --help
+```
+
+### Publish to PyPI
+
+```bash
+# Upload to Test PyPI first (recommended)
+twine upload --repository testpypi dist/*
+
+# Test installation from Test PyPI
+pip install --index-url https://test.pypi.org/simple/ ultimate-ai-cli-agent
+
+# If everything works, upload to main PyPI
+twine upload dist/*
+```
+
+### After Publishing
+
+Once published to PyPI, users can install with:
+
+```bash
+pip install ultimate-ai-cli-agent
+```
+
+All these command aliases will be available:
+- `ultimate-ai-cli` (main command)
+- `uai` (short alias)
+- `ai-agent` (alternative name)
+- `ollama-agent` (legacy compatibility)
+- `ultimate-agent` (alternative)
+
+### Package Information
+
+- **Package Name**: `ultimate-ai-cli-agent`
+- **Current Version**: `2.0.0`
+- **Python Requirements**: `>=3.8`
+- **License**: MIT
+````

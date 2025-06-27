@@ -10,7 +10,7 @@ authors = [
 ]
 description = "The Ultimate AI CLI Agent with internet access, browser automation, server management, and enhanced intelligence"
 readme = "README.md"
-license = {file = "LICENSE"}
+license = {text = "MIT"}
 requires-python = ">=3.8"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -32,7 +32,6 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Operating System :: Microsoft :: Windows",
     "Environment :: Console",
-    "License :: OSI Approved :: MIT License",
 ]
 keywords = [
     "ai", "agent", "cli", "development", "automation", "ollama", "llm",

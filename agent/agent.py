@@ -23,6 +23,7 @@ class Agent:
         adaptive_steps: bool = True,
         auto_test: bool = True,  # Enable automatic testing
         no_confirm: bool = False,  # Skip confirmations for operations
+        enhanced_ui=None,  # Enhanced UI instance
     ):
         self.model = model
         self.max_steps = max_steps
@@ -41,6 +42,7 @@ class Agent:
         self.quality_threshold = 0.8  # Minimum quality score for generated code
         self.no_confirm = no_confirm
         self.session_consent_given = False  # Track if user has given session-wide consent
+        self.enhanced_ui = enhanced_ui  # Store enhanced UI instance
 
     def _get_ollama_response(self, prompt: str) -> str:
         url = "http://localhost:11434/api/generate"
@@ -95,13 +97,18 @@ class Agent:
             from .intelligence_tools import analyze_task_intelligence
             analysis_result = analyze_task_intelligence(goal, "adaptive")
             analysis_data = json.loads(analysis_result)
-            self.console.print(f"[cyan]🧠 Task Analysis:[/]")
-            self.console.print(f"  • Complexity Score: {analysis_data.get('complexity_score', 0):.2f}")
-            self.console.print(f"  • Estimated Steps: {analysis_data.get('estimated_steps', 'Unknown')}")
-            if analysis_data.get('recommendations'):
-                self.console.print("  • Recommendations:")
-                for rec in analysis_data['recommendations']:
-                    self.console.print(f"    - {rec}")
+            
+            # Use enhanced UI if available
+            if self.enhanced_ui:
+                self.enhanced_ui.show_goal_analysis(analysis_data)
+            else:
+                self.console.print(f"[cyan]🧠 Task Analysis:[/]")
+                self.console.print(f"  • Complexity Score: {analysis_data.get('complexity_score', 0):.2f}")
+                self.console.print(f"  • Estimated Steps: {analysis_data.get('estimated_steps', 'Unknown')}")
+                if analysis_data.get('recommendations'):
+                    self.console.print("  • Recommendations:")
+                    for rec in analysis_data['recommendations']:
+                        self.console.print(f"    - {rec}")
         except Exception as e:
             if self.verbose:
                 self.console.print(f"[dim]Task analysis unavailable: {e}[/]")
@@ -115,10 +122,14 @@ class Agent:
         # Calculate adaptive max steps based on task complexity
         if self.adaptive_steps:
             self.max_steps = self._calculate_adaptive_steps(goal)
-            self.console.print(f"[dim]Adaptive max steps: {self.max_steps}[/]")
+            if self.enhanced_ui:
+                self.enhanced_ui.add_status_message(f"Adaptive max steps: {self.max_steps}")
+            else:
+                self.console.print(f"[dim]Adaptive max steps: {self.max_steps}[/]")
 
         for step in range(1, self.max_steps + 1):
-            self.console.rule(f"Step {step}/{self.max_steps}")
+            if not self.enhanced_ui:
+                self.console.rule(f"Step {step}/{self.max_steps}")
 
             # Create enhanced prompt with context
             relevant_context = self.memory.get_relevant_context(goal)
@@ -147,40 +158,67 @@ class Agent:
             parsed_response, parsing_errors = self.prompt_engine.parse_response(response_text)
             
             if parsed_response is None:
-                self.console.print("[red]Failed to parse model response.[/]")
+                error_msg = "Failed to parse model response"
+                if self.enhanced_ui:
+                    self.enhanced_ui.show_error(error_msg)
+                else:
+                    self.console.print(f"[red]{error_msg}.[/]")
+                
                 if parsing_errors:
-                    self.console.print("[yellow]Parsing errors:[/]")
-                    for error in parsing_errors:
-                        self.console.print(f"  • {error}")
+                    if self.enhanced_ui:
+                        for error in parsing_errors:
+                            self.enhanced_ui.add_status_message(f"Parse error: {error}")
+                    else:
+                        self.console.print("[yellow]Parsing errors:[/]")
+                        for error in parsing_errors:
+                            self.console.print(f"  • {error}")
                 
                 # Use recovery action
                 recovery_action = self.prompt_engine.suggest_recovery_action(goal, self.history, parsing_errors)
-                self.console.print(f"[cyan]Using recovery action: {recovery_action['tool']}[/]")
+                if self.enhanced_ui:
+                    self.enhanced_ui.add_status_message(f"Using recovery action: {recovery_action['tool']}")
+                else:
+                    self.console.print(f"[cyan]Using recovery action: {recovery_action['tool']}[/]")
                 parsed_response = recovery_action
 
             tool = parsed_response.get("tool")
             args = parsed_response.get("args", {})
             thought = parsed_response.get("thought", "")
             
+            # Update enhanced UI
+            if self.enhanced_ui:
+                self.enhanced_ui.update_step(step, tool, thought)
+            
             # Validate tool exists and suggest corrections
             if tool not in available_tools:
-                suggested_tool = self.response_validator.suggest_tool_correction(tool, available_tools)
+                suggested_tool = self.response_validator.suggest_tool_correction(tool or "", available_tools)
                 if suggested_tool:
-                    self.console.print(f"[yellow]Unknown tool '{tool}', did you mean '{suggested_tool}'?[/]")
+                    warning_msg = f"Unknown tool '{tool}', did you mean '{suggested_tool}'?"
+                    if self.enhanced_ui:
+                        self.enhanced_ui.show_error(warning_msg)
+                    else:
+                        self.console.print(f"[yellow]{warning_msg}[/]")
                     tool = suggested_tool
                 else:
-                    self.console.print(f"[red]Unknown tool '{tool}', using no_op instead[/]")
+                    error_msg = f"Unknown tool '{tool}', using no_op instead"
+                    if self.enhanced_ui:
+                        self.enhanced_ui.show_error(error_msg)
+                    else:
+                        self.console.print(f"[red]{error_msg}[/]")
                     tool = "no_op"
                     args = {"reason": f"Unknown tool attempted: {tool}"}
             
             # Validate tool arguments
             args_valid, arg_errors = self.response_validator.validate_tool_args(tool, args)
             if not args_valid:
-                self.console.print("[yellow]Tool argument validation errors:[/]")
-                for error in arg_errors:
-                    self.console.print(f"  • {error}")
+                if self.enhanced_ui:
+                    self.enhanced_ui.show_error("Tool argument validation errors", "\n".join(arg_errors))
+                else:
+                    self.console.print("[yellow]Tool argument validation errors:[/]")
+                    for error in arg_errors:
+                        self.console.print(f"  • {error}")
 
-            if thought:
+            if thought and not self.enhanced_ui:
                 self.console.print(f"[yellow]Thought:[/] {thought}")
 
             # if model did not return a valid tool, ask for clarification
@@ -197,9 +235,12 @@ class Agent:
             # handle finish
             if tool == "finish":
                 reason = args.get("reason", "")
-                self.console.print("[bold green]Goal achieved![/]")
-                if reason:
-                    self.console.print(reason)
+                if self.enhanced_ui:
+                    self.enhanced_ui.show_success("Goal achieved!", reason)
+                else:
+                    self.console.print("[bold green]Goal achieved![/]")
+                    if reason:
+                        self.console.print(reason)
                 # Mark task success in memory
                 self.memory.store_memory("goal_accomplished", {"goal": self.goal, "reason": reason}, success=True)
                 break
@@ -207,7 +248,10 @@ class Agent:
             # handle explicit no-op
             if tool == "no_op":
                 reason = args.get("reason", "")
-                self.console.print(f"[yellow]No-op:[/] {reason}")
+                if self.enhanced_ui:
+                    self.enhanced_ui.add_status_message(f"No-op: {reason}")
+                else:
+                    self.console.print(f"[yellow]No-op:[/] {reason}")
                 # Store no-op in memory
                 self.memory.store_memory("no_op", {"goal": self.goal, "reason": reason}, success=False)
                 response = Prompt.ask("Provide clarification or press Enter to exit", default="")
@@ -220,8 +264,14 @@ class Agent:
             # execute tools
             result = self._execute_tool(tool, args)
             self.memory.store_memory("tool_usage", {"tool": tool, "args": args, "result": result})
-            self.console.print(f"[blue]Action:[/] {tool} [blue]Args:[/]{args}")
-            self.console.print(f"[green]Result:[/] {result}")
+            
+            # Display tool execution
+            if self.enhanced_ui:
+                self.enhanced_ui.show_tool_execution(tool, args, result)
+            else:
+                self.console.print(f"[blue]Action:[/] {tool} [blue]Args:[/]{args}")
+                self.console.print(f"[green]Result:[/] {result}")
+            
             self.history.append({"action": tool, "args": args, "result": result})
             
             # Perform self-testing and iteration at regular intervals
@@ -233,7 +283,11 @@ class Agent:
 
         else:
             # loop did not break
-            self.console.print(f"[red]Max steps ({self.max_steps}) reached; ending execution.[/]")
+            max_steps_msg = f"Max steps ({self.max_steps}) reached; ending execution"
+            if self.enhanced_ui:
+                self.enhanced_ui.show_error(max_steps_msg)
+            else:
+                self.console.print(f"[red]{max_steps_msg}.[/]")
 
     def _execute_tool(self, tool_name: str, args: dict) -> str:
         """Execute tool with session-level consent instead of per-operation confirmations."""

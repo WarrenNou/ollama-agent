@@ -1,4 +1,5 @@
 from .agent import Agent
+from .ui import EnhancedUI, ui
 import click
 import sys
 import os
@@ -11,7 +12,7 @@ from rich.markdown import Markdown
 
 def show_welcome():
     """Display welcome message and instructions."""
-    console = Console()
+    enhanced_ui = EnhancedUI()
     
     welcome_text = """
 # 🤖 Ollama CLI Agent
@@ -41,7 +42,10 @@ Welcome to the Ollama CLI Agent! This AI agent can help you execute various task
 Support the project by starring the repository on GitHub and sharing it with your friends https://github.com/WarrenNou!
     """
     
-    console.print(Panel(Markdown(welcome_text), title="🚀 Getting Started", border_style="blue"))
+    enhanced_ui.console.print(Panel(Markdown(welcome_text), title="🚀 Getting Started", border_style="blue"))
+    enhanced_ui.console.print()
+    enhanced_ui.console.print("[dim]💡 Pro tip: Use [bold]--help[/] to see all available options![/]")
+    enhanced_ui.console.print()
 
 
 def check_ollama_connection(model: str, console: Console) -> bool:
@@ -174,7 +178,9 @@ def main(goal, model, max_steps, adaptive_steps, timeout, verbose, stream, inter
     
     GOAL: Optional goal to execute immediately. If not provided, you'll be prompted.
     """
-    console = Console()
+    # Create enhanced UI instance
+    enhanced_ui = EnhancedUI()
+    console = enhanced_ui.console
     
     # Show available tools and exit
     if show_tools:
@@ -184,6 +190,9 @@ def main(goal, model, max_steps, adaptive_steps, timeout, verbose, stream, inter
     # Show welcome message if no goal provided
     if not goal:
         show_welcome()
+    else:
+        # Show startup banner for direct goals
+        enhanced_ui.show_startup_banner(model, os.getcwd())
     
     # Check and setup Ollama
     if not check_and_setup_ollama(console):
@@ -193,10 +202,7 @@ def main(goal, model, max_steps, adaptive_steps, timeout, verbose, stream, inter
     if not check_ollama_connection(model, console):
         sys.exit(1)
     
-    console.print(f"[bold cyan]🤖 Using model:[/] {model}")
-    console.print(f"[dim]Current directory:[/] {os.getcwd()}")
-    
-    # Create agent
+    # Create agent with enhanced UI
     agent = Agent(
         model=model,
         max_steps=max_steps,
@@ -206,79 +212,89 @@ def main(goal, model, max_steps, adaptive_steps, timeout, verbose, stream, inter
         console=console,
         adaptive_steps=adaptive_steps,
         no_confirm=no_confirm,
+        enhanced_ui=enhanced_ui,  # Pass the enhanced UI
     )
     
     # Show warning if no-confirm mode is enabled
     if no_confirm:
-        console.print("[yellow]⚠️  Running in no-confirmation mode![/]")
+        enhanced_ui.add_status_message("⚠️ Running in no-confirmation mode!")
     
     try:
         if test:
             # Run comprehensive tests and exit
             from .testing import AgentTester
             tester = AgentTester(console)
-            console.print("[bold cyan]🧪 Running comprehensive agent tests...[/]")
+            enhanced_ui.add_status_message("🧪 Running comprehensive agent tests...")
             report = tester.run_comprehensive_tests(agent)
             
             if report["success_rate"] >= 80:
-                console.print("[bold green]✅ All tests passed! Agent is ready for use.[/]")
+                enhanced_ui.show_success("All tests passed! Agent is ready for use.")
                 sys.exit(0)
             else:
-                console.print(f"[bold red]❌ Some tests failed ({report['success_rate']:.1f}% success rate)[/]")
+                enhanced_ui.show_error(f"Some tests failed ({report['success_rate']:.1f}% success rate)")
                 sys.exit(1)
         
         elif monitor:
             # Run continuous health monitoring
             from .testing import AgentTester
             tester = AgentTester(console)
+            enhanced_ui.add_status_message("🔍 Starting continuous monitoring...")
             tester.run_continuous_monitoring(agent)
         
         elif infinite:
             # Infinite mode with self-monitoring and testing
             from .infinite_runner import InfiniteRunner
             runner = InfiniteRunner(agent, console)
+            enhanced_ui.add_status_message("♾️ Starting infinite mode...")
             runner.start_infinite_mode(goal)
         
         elif interactive:
             # Interactive mode - keep asking for new goals
+            enhanced_ui.add_status_message("🔄 Interactive mode enabled")
             console.print("[bold green]🔄 Interactive mode enabled. Type 'exit' or 'quit' to stop.[/]")
             
             while True:
                 if not goal:
-                    goal = console.input("\n[bold green]What is your goal? [/]")
+                    goal = enhanced_ui.show_interactive_prompt("What is your goal?")
                 
                 if goal.lower() in ['exit', 'quit', 'q']:
-                    console.print("[cyan]👋 Goodbye![/]")
+                    enhanced_ui.show_success("Goodbye! 👋")
                     break
                 
                 if goal.strip():
-                    console.print(f"\n[bold blue]🎯 Goal:[/] {goal}")
+                    enhanced_ui.start_execution_display(goal, max_steps)
                     agent.execute(goal)
+                    enhanced_ui.finish_execution(True)
                     
                     if not Confirm.ask("\n[bold green]Continue with another task?[/]", default=True):
-                        console.print("[cyan]👋 Goodbye![/]")
+                        enhanced_ui.show_success("Goodbye! 👋")
                         break
                 
                 goal = None  # Reset for next iteration
         else:
             # Single execution mode
             if not goal:
-                goal = console.input("[bold green]What is your goal? [/]")
+                goal = enhanced_ui.show_interactive_prompt("What is your goal?")
             
             if goal.strip():
-                console.print(f"\n[bold blue]🎯 Goal:[/] {goal}")
+                enhanced_ui.start_execution_display(goal, max_steps)
                 agent.execute(goal)
+                enhanced_ui.finish_execution(True)
             else:
-                console.print("[yellow]No goal provided.[/]")
+                enhanced_ui.show_error("No goal provided")
                 
     except KeyboardInterrupt:
-        console.print("\n[yellow]⚠️  Interrupted by user.[/]")
+        enhanced_ui.show_error("Interrupted by user")
+        if enhanced_ui.live_display:
+            enhanced_ui.finish_execution(False, "Interrupted by user")
         sys.exit(1)
     except Exception as e:
-        console.print(f"\n[red]❌ Unexpected error: {e}[/]")
+        enhanced_ui.show_error(f"Unexpected error: {e}")
         if verbose:
             import traceback
             console.print(traceback.format_exc())
+        if enhanced_ui.live_display:
+            enhanced_ui.finish_execution(False, str(e))
         sys.exit(1)
 
 
@@ -286,33 +302,26 @@ def show_available_tools(console: Console):
     """Display all available tools in a formatted table."""
     from .tools import TOOLS
     
-    table = Table(title="🛠️  Available Tools")
-    table.add_column("Tool", style="cyan")
-    table.add_column("Description", style="white")
-    table.add_column("Safety", style="yellow")
+    # Create enhanced UI for better display
+    enhanced_ui = EnhancedUI(console)
     
     tool_info = {
-        "execute_shell_command": ("Execute shell commands", "⚠️  Requires confirmation"),
-        "search_file": ("Read file contents", "✅ Safe"),
-        "modify_file": ("Write/modify files", "⚠️  Shows diff, requires confirmation"),
-        "list_directory": ("List directory contents", "✅ Safe"),
-        "find_files": ("Find files by pattern", "✅ Safe"),
-        "get_file_info": ("Get file metadata", "✅ Safe"),
-        "create_directory": ("Create directories", "✅ Safe"),
-        "copy_file": ("Copy files", "✅ Safe"),
-        "move_file": ("Move/rename files", "⚠️  Requires confirmation"),
-        "delete_file": ("Delete files/directories", "🚨 Requires confirmation"),
-        "search_in_files": ("Search text in files", "✅ Safe"),
-        "get_current_directory": ("Get current directory", "✅ Safe"),
-        "change_directory": ("Change directory", "✅ Safe"),
+        "execute_shell_command": "Execute shell commands",
+        "search_file": "Read file contents", 
+        "modify_file": "Write/modify files",
+        "list_directory": "List directory contents",
+        "find_files": "Find files by pattern",
+        "get_file_info": "Get file metadata",
+        "create_directory": "Create directories",
+        "copy_file": "Copy files",
+        "move_file": "Move/rename files",
+        "delete_file": "Delete files/directories",
+        "search_in_files": "Search for text patterns within files",
+        "get_current_directory": "Get current working directory",
+        "change_directory": "Change working directory",
     }
     
-    for tool_name in TOOLS.keys():
-        if tool_name in tool_info:
-            desc, safety = tool_info[tool_name]
-            table.add_row(tool_name, desc, safety)
-    
-    console.print(table)
+    enhanced_ui.show_tool_help(tool_info)
     console.print("\n[dim]Use --help for more CLI options[/]")
 
 
