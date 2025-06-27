@@ -1,0 +1,227 @@
+# Ultimate AI CLI Agent - GitHub Actions CI/CD
+name: Build and Publish
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+          pip install pytest pytest-cov
+
+      - name: Lint with flake8
+        run: |
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Exit-zero treats all errors as warnings
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Test with pytest
+        run: |
+          pytest --cov=agent --cov-report=xml --cov-report=html
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: true
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build package
+        run: python -m build
+
+      - name: Check package
+        run: twine check dist/*
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: dist/
+
+  publish-pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          pip install twine
+          twine upload dist/*
+
+  publish-docker:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ultimate-ai-cli/agent
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  create-release-notes:
+    needs: [publish-pypi, publish-docker]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Release Notes
+        run: |
+          echo "## 🚀 What's New" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Installation" >> release_notes.md
+          echo "```bash" >> release_notes.md
+          echo "# PyPI" >> release_notes.md
+          echo "pip install ultimate-ai-cli-agent[full]==${{ github.event.release.tag_name }}" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "# Docker" >> release_notes.md
+          echo "docker run -it ultimate-ai-cli/agent:${{ github.event.release.tag_name }}" >> release_notes.md
+          echo "```" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Links" >> release_notes.md
+          echo "- 📦 [PyPI Package](https://pypi.org/project/ultimate-ai-cli-agent/${{ github.event.release.tag_name }}/)" >> release_notes.md
+          echo "- 🐳 [Docker Image](https://hub.docker.com/r/ultimate-ai-cli/agent/tags)" >> release_notes.md
+          echo "- 📖 [Documentation](https://ultimate-ai-cli.readthedocs.io/)" >> release_notes.md
+          echo "- 🐛 [Report Issues](https://github.com/ultimate-ai-cli/ultimate-ai-cli-agent/issues)" >> release_notes.md
+
+      - name: Update Release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const release_notes = fs.readFileSync('release_notes.md', 'utf8');
+
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id,
+              body: context.payload.release.body + '\n\n' + release_notes
+            });
+
+  notify-community:
+    needs: [publish-pypi, publish-docker]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+
+    steps:
+      - name: Notify Discord
+        if: secrets.DISCORD_WEBHOOK_URL
+        run: |
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "{\"content\":\"🎉 **Ultimate AI CLI Agent ${{ github.event.release.tag_name }}** has been released!\\n\\n📦 Install: \`pip install ultimate-ai-cli-agent[full]==${{ github.event.release.tag_name }}\`\\n🐳 Docker: \`docker run -it ultimate-ai-cli/agent:${{ github.event.release.tag_name }}\`\\n\\n🔗 [Release Notes](${{ github.event.release.html_url }})\"}" \
+               ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+      - name: Tweet Release
+        if: secrets.TWITTER_API_KEY
+        uses: ethomson/send-tweet-action@v1
+        with:
+          status: |
+            🚀 Ultimate AI CLI Agent ${{ github.event.release.tag_name }} is now available!
+
+            ✨ Internet access, browser automation, server management & more
+            📦 pip install ultimate-ai-cli-agent[full]
+            🐳 docker run -it ultimate-ai-cli/agent
+
+            #AI #CLI #Developer #Automation
+
+            ${{ github.event.release.html_url }}
+          consumer-key: ${{ secrets.TWITTER_API_KEY }}
+          consumer-secret: ${{ secrets.TWITTER_API_SECRET }}
+          access-token: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          access-token-secret: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}

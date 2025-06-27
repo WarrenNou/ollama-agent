@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  # Full-featured Ultimate AI CLI Agent
+  ultimate-ai-cli:
+    build: .
+    image: ultimate-ai-cli/agent:latest
+    container_name: ultimate-ai-cli-agent
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./downloads:/app/downloads
+      - /var/run/docker.sock:/var/run/docker.sock  # For Docker management
+    environment:
+      - AGENT_DATA_DIR=/app/data
+      - AGENT_LOG_DIR=/app/logs
+      - AGENT_DOWNLOAD_DIR=/app/downloads
+    stdin_open: true
+    tty: true
+    networks:
+      - agent-network
+    restart: unless-stopped
+
+  # Web-focused variant
+  ultimate-ai-cli-web:
+    build:
+      context: .
+      target: web
+    image: ultimate-ai-cli/agent:web
+    container_name: ultimate-ai-cli-web
+    volumes:
+      - ./data:/app/data
+      - ./downloads:/app/downloads
+    environment:
+      - AGENT_MODE=web
+    ports:
+      - "8080:8080"  # For web server if needed
+    stdin_open: true
+    tty: true
+    networks:
+      - agent-network
+
+  # Server management variant
+  ultimate-ai-cli-server:
+    build:
+      context: .
+      target: server
+    image: ultimate-ai-cli/agent:server
+    container_name: ultimate-ai-cli-server
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - AGENT_MODE=server
+    privileged: true  # For system management
+    stdin_open: true
+    tty: true
+    networks:
+      - agent-network
+
+  # Minimal variant for basic usage
+  ultimate-ai-cli-minimal:
+    build:
+      context: .
+      target: minimal
+    image: ultimate-ai-cli/agent:minimal
+    container_name: ultimate-ai-cli-minimal
+    volumes:
+      - ./data:/app/data
+    environment:
+      - AGENT_MODE=minimal
+    stdin_open: true
+    tty: true
+    networks:
+      - agent-network
+
+  # Development environment
+  ultimate-ai-cli-dev:
+    build:
+      context: .
+      target: full
+    image: ultimate-ai-cli/agent:dev
+    container_name: ultimate-ai-cli-dev
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - AGENT_DEV_MODE=true
+      - PYTHONPATH=/app
+    working_dir: /app
+    command: /bin/bash
+    stdin_open: true
+    tty: true
+    networks:
+      - agent-network
+
+networks:
+  agent-network:
+    driver: bridge
+
+volumes:
+  agent_data:
+  agent_logs:
+  agent_downloads:

@@ -1,0 +1,117 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ultimate-ai-cli-agent"
+version = "2.0.0"
+authors = [
+  { name="Ultimate AI CLI Agent Contributors", email="contributors@ultimate-ai-cli.dev" },
+]
+description = "The Ultimate AI CLI Agent with internet access, browser automation, server management, and enhanced intelligence"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: System Shells",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+    "Topic :: System :: Systems Administration",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10", 
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+    "Environment :: Console",
+    "License :: OSI Approved :: MIT License",
+]
+keywords = [
+    "ai", "agent", "cli", "development", "automation", "ollama", "llm",
+    "web-scraping", "browser-automation", "server-management", "intelligence",
+    "terminal", "system-administration", "devops", "productivity"
+]
+dependencies = [
+    "requests>=2.31.0",
+    "rich>=13.0.0", 
+    "click>=8.0.0",
+    "typing-extensions>=4.0.0",
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    # Enhanced dependencies
+    "psutil>=5.9.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0.0",
+]
+
+[project.optional-dependencies]
+full = [
+    # Web and Browser Automation
+    "selenium>=4.15.0",
+    "beautifulsoup4>=4.12.0",
+    "webdriver-manager>=4.0.0",
+    "Pillow>=10.0.0",
+    "lxml>=4.9.0",
+    # Server and Process Management
+    "flask>=3.0.0",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    # Data Processing
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    # Additional Utilities
+    "aiohttp>=3.8.0",
+    "httpx>=0.25.0",
+    "websockets>=12.0",
+    "cryptography>=41.0.0",
+]
+dev = [
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.6.0",
+    "pre-commit>=3.5.0",
+    "pytest-cov>=4.1.0",
+    "sphinx>=7.0.0",
+    "sphinx-rtd-theme>=1.3.0",
+]
+web = [
+    "selenium>=4.15.0",
+    "beautifulsoup4>=4.12.0",
+    "webdriver-manager>=4.0.0",
+    "Pillow>=10.0.0",
+    "lxml>=4.9.0",
+    "aiohttp>=3.8.0",
+    "httpx>=0.25.0",
+]
+server = [
+    "flask>=3.0.0",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "psutil>=5.9.0",
+]
+minimal = []
+
+[project.urls]
+Homepage = "https://github.com/ultimate-ai-cli/ultimate-ai-cli-agent"
+Documentation = "https://ultimate-ai-cli.readthedocs.io/"
+Repository = "https://github.com/ultimate-ai-cli/ultimate-ai-cli-agent.git"
+"Bug Tracker" = "https://github.com/ultimate-ai-cli/ultimate-ai-cli-agent/issues"
+Changelog = "https://github.com/ultimate-ai-cli/ultimate-ai-cli-agent/blob/main/CHANGELOG.md"
+Funding = "https://github.com/sponsors/ultimate-ai-cli"
+
+[project.scripts]
+ultimate-ai-cli = "agent.main:main"
+uai = "agent.main:main"  # Short alias
+ai-agent = "agent.main:main"  # Alternative name
+ollama-agent = "agent.main:main"  # Legacy compatibility
+ultimate-agent = "agent.main:main"
